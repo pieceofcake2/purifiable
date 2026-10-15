@@ -25,6 +25,10 @@ class PurifiableBehaviorTest extends CakeTestCase
 {
     protected const XSS = '<p onclick="alert(1)">Hello <script>alert(1)</script><b>world</b></p>';
 
+    protected const CLEAN = '<p>Hello <b>world</b></p>';
+
+    protected const SIMPLE = '<p>x</p>';
+
     public $fixtures = ['plugin.purifiable.purifiable_post'];
 
     protected Model $Post;
@@ -68,7 +72,7 @@ class PurifiableBehaviorTest extends CakeTestCase
         $result = $this->saveAndRead(['body' => self::XSS]);
 
         $this->assertSame(self::XSS, $result['body'], 'The original value is kept.');
-        $this->assertSame('<p>Hello <b>world</b></p>', $result['body_clean']);
+        $this->assertSame(self::CLEAN, $result['body_clean']);
     }
 
     public function testSaveToPrefixedField(): void
@@ -76,7 +80,7 @@ class PurifiableBehaviorTest extends CakeTestCase
         $this->attach(['fields' => ['body'], 'affix' => 'clean_', 'affix_position' => 'prefix']);
         $result = $this->saveAndRead(['body' => self::XSS]);
 
-        $this->assertSame('<p>Hello <b>world</b></p>', $result['clean_body']);
+        $this->assertSame(self::CLEAN, $result['clean_body']);
         $this->assertNull($result['body_clean']);
     }
 
@@ -85,7 +89,7 @@ class PurifiableBehaviorTest extends CakeTestCase
         $this->attach(['fields' => ['body', 'excerpt'], 'overwrite' => true]);
         $result = $this->saveAndRead(['body' => self::XSS, 'excerpt' => '<a href="javascript:alert(1)">x</a>']);
 
-        $this->assertSame('<p>Hello <b>world</b></p>', $result['body']);
+        $this->assertSame(self::CLEAN, $result['body']);
         $this->assertSame('<a>x</a>', $result['excerpt']);
     }
 
@@ -145,7 +149,7 @@ class PurifiableBehaviorTest extends CakeTestCase
     {
         $this->attach(['fields' => ['body']]);
 
-        $this->assertSame('<p>Hello <b>world</b></p>', $this->Post->clean(self::XSS));
+        $this->assertSame(self::CLEAN, $this->Post->clean(self::XSS));
         $this->assertSame('', $this->Post->clean(null));
     }
 
@@ -166,7 +170,7 @@ class PurifiableBehaviorTest extends CakeTestCase
         $path = TMP . 'tests' . DS . 'purifiable_' . uniqid();
         $this->attach(['fields' => ['body'], 'config' => ['Cache' => ['SerializerPath' => $path]]]);
 
-        $this->assertSame('<p>x</p>', $this->Post->clean('<p>x</p>'));
+        $this->assertSame(self::SIMPLE, $this->Post->clean(self::SIMPLE));
         $this->assertDirectoryExists($path);
         (new Folder($path))->delete();
     }
@@ -175,6 +179,6 @@ class PurifiableBehaviorTest extends CakeTestCase
     {
         $this->attach(['fields' => ['body'], 'config' => ['Cache' => ['DefinitionImpl' => null]]]);
 
-        $this->assertSame('<p>x</p>', $this->Post->clean('<p>x</p>'));
+        $this->assertSame(self::SIMPLE, $this->Post->clean(self::SIMPLE));
     }
 }

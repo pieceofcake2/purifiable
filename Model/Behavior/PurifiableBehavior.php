@@ -161,8 +161,8 @@ class PurifiableBehavior extends ModelBehavior
         }
 
         $path = $settings['config']['Cache']['SerializerPath'] ?? null;
-        if (is_string($path) && $path !== '' && !is_dir($path) && !mkdir($path, 0777, true) && !is_dir($path)) {
-            throw new CakeException(sprintf('Cannot create the HTML Purifier cache directory %s.', $path));
+        if (is_string($path) && $path !== '') {
+            $this->_createDirectory($path);
         }
 
         if ($settings['customFilters']) {
@@ -174,5 +174,23 @@ class PurifiableBehavior extends ModelBehavior
         }
 
         return $config;
+    }
+
+    /**
+     * Create the directory of the definition cache if it does not exist.
+     *
+     * @param string $path Directory.
+     * @return void
+     * @throws CakeException When the directory cannot be created.
+     */
+    protected function _createDirectory(string $path): void
+    {
+        if (is_dir($path)) {
+            return;
+        }
+        // Another request may have created it in the meantime.
+        if (!mkdir($path, 0777, true) && !is_dir($path)) {
+            throw new CakeException(sprintf('Cannot create the HTML Purifier cache directory %s.', $path));
+        }
     }
 }
