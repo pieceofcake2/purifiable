@@ -1,94 +1,79 @@
-[![Build Status](https://img.shields.io/travis/josegonzalez/cakephp-purifiable/master.svg?style=flat-square)](https://travis-ci.org/josegonzalez/cakephp-purifiable) 
-[![Coverage Status](https://img.shields.io/coveralls/josegonzalez/cakephp-purifiable.svg?style=flat-square)](https://coveralls.io/r/josegonzalez/cakephp-purifiable?branch=master) 
-[![Total Downloads](https://img.shields.io/packagist/dt/josegonzalez/cakephp-purifiable.svg?style=flat-square)](https://packagist.org/packages/josegonzalez/cakephp-purifiable) 
-[![Latest Stable Version](https://img.shields.io/packagist/v/josegonzalez/cakephp-purifiable.svg?style=flat-square)](https://packagist.org/packages/josegonzalez/cakephp-purifiable) 
-[![Documentation Status](https://readthedocs.org/projects/cakephp-purifiable/badge/?version=latest&style=flat-square)](https://readthedocs.org/projects/cakephp-purifiable/?badge=latest)
-[![Gratipay](https://img.shields.io/gratipay/josegonzalez.svg?style=flat-square)](https://gratipay.com/~josegonzalez/)
+# CakePHP 2 Purifiable Plugin
 
-# Purifiable
+[![GitHub License](https://img.shields.io/github/license/pieceofcake2/purifiable?label=License)](LICENSE)
+[![Packagist Version](https://img.shields.io/packagist/v/pieceofcake2/purifiable?label=Packagist)](https://packagist.org/packages/pieceofcake2/purifiable)
+![PHP](https://img.shields.io/packagist/dependency-v/pieceofcake2/purifiable/php?logo=php&logoColor=%23FFFFFF&label=PHP&labelColor=%23777BB4&color=%23FFFFFF)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level%205-brightgreen?label=PHPStan)](https://github.com/pieceofcake2/purifiable/actions/workflows/CI.yml)
+![CakePHP](https://img.shields.io/packagist/dependency-v/pieceofcake2/purifiable/pieceofcake2/cakephp?logo=cakephp&logoColor=%23FFFFFF&label=CakePHP&labelColor=%23D33C43&color=%23FFFFFF)
+[![CI](https://img.shields.io/github/actions/workflow/status/pieceofcake2/purifiable/CI.yml?label=CI)](https://github.com/pieceofcake2/purifiable/actions/workflows/CI.yml)
+[![Codecov](https://img.shields.io/codecov/c/gh/pieceofcake2/purifiable?label=Coverage)](https://codecov.io/gh/pieceofcake2/purifiable)
 
-Sanitize model data easily
+__This is forked for CakePHP2.__
 
-## Background
+A model behavior for [pieceofcake2/cakephp](https://github.com/pieceofcake2/cakephp) applications
+that sanitizes HTML fields with [HTML Purifier](http://htmlpurifier.org/) before they are saved:
+it removes malicious code (XSS) and keeps the allowed formatting.
 
-Someone on #cakephp had an issue with PHP timing out. Normally, I’d say it was just bad coding, but it’s probably just a bad practice on their part. The issue they had is with HTML Purifier. I built this behavior to make sanitizing data a bit simpler.
+## Documentation
+
+- Website: https://pieceofcake2.github.io/purifiable/ (日本語: https://pieceofcake2.github.io/purifiable/ja/)
+- Markdown: [docs/README.md](docs/README.md) (日本語: [docs/ja/README.md](docs/ja/README.md)) (for AI tools and offline reading)
+
+It covers the settings, the HTML Purifier configuration, custom filters, the definition cache and
+the migration from `josegonzalez/cakephp-purifiable`.
+
+The Markdown documentation is also included in the Composer package, in the plugin's directory: `plugins/Purifiable/docs/README.md` (the location depends on your `installer-paths`).
 
 ## Requirements
 
-* CakePHP 2.x
-* PHP 5.3
+* PHP 8.0+
+* pieceofcake2/cakephp 2.12+
+* ezyang/htmlpurifier 4.17+ (installed with the plugin)
 
 ## Installation
 
-_[Using [Composer](http://getcomposer.org/)]_
-
-Add the plugin to your project's `composer.json` - something like this:
-
-```composer
-	{
-		"require": {
-			"josegonzalez/cakephp-purifiable": "dev-master"
-		}
-	}
-```
-
-Because this plugin has the type `cakephp-plugin` set in its own `composer.json`, Composer will install it inside your `/Plugins` directory, rather than in the usual vendors file. It is recommended that you add `/Plugins/Purifiable` to your .gitignore file. (Why? [read this](http://getcomposer.org/doc/faqs/should-i-commit-the-dependencies-in-my-vendor-directory.md).)
-
-_[Manual]_
-
-* Download this: [http://github.com/josegonzalez/cakephp-purifiable/zipball/master](http://github.com/josegonzalez/cakephp-purifiable/zipball/master)
-* Unzip that download.
-* Copy the resulting folder to `app/Plugin`
-* Rename the folder you just copied to `Purifiable`
-
-_[GIT Submodule]_
-
-In your app directory type:
-
 ```bash
-	git submodule add -b master git://github.com/josegonzalez/cakephp-purifiable.git Plugin/Purifiable
-	git submodule init
-	git submodule update
+composer require pieceofcake2/purifiable
 ```
 
-_[GIT Clone]_
+Load the plugin in `config/bootstrap.php` (legacy layout: `app/Config/bootstrap.php`):
 
-In your `Plugin` directory type:
+```php
+CakePlugin::load('Purifiable');
+```
 
-		git clone -b master git://github.com/josegonzalez/cakephp-purifiable.git Purifiable
-
-### Enable plugin
-
-In 2.0 you need to enable the plugin in your `app/Config/bootstrap.php` file:
-
-		CakePlugin::load('Purifiable');
-
-If you are already using `CakePlugin::loadAll();`, then this is not necessary.
+See [Installation](docs/README.md#installation) for the `installer-paths` setting.
 
 ## Usage
 
-## TODO
+```php
+class Post extends AppModel
+{
+    public $actsAs = [
+        'Purifiable.Purifiable' => [
+            'fields' => ['body'],
+            'overwrite' => true,
+        ],
+    ];
+}
+```
+
+`body` is purified when the post is saved. Without `overwrite`, the original value is kept and the
+purified HTML is saved to `body_clean`. See [Settings](docs/README.md#settings).
+
+## Contributing
+
+See the [contribution guidelines](https://github.com/pieceofcake2/.github/blob/master/CONTRIBUTING.md).
+
+## Origin
+
+This package is a maintained fork of
+[josegonzalez/cakephp-purifiable](https://github.com/josegonzalez/cakephp-purifiable)
+(`josegonzalez/cakephp-purifiable` on Packagist, archived), originally by Jose Diaz-Gonzalez. It is
+maintained for CakePHP 2 on modern PHP by [pieceofcake2](https://github.com/pieceofcake2). Changes
+from the original are listed in the
+[commit history since the fork](https://github.com/pieceofcake2/purifiable/compare/548a479...1.x).
 
 ## License
 
-The MIT License (MIT)
-
-Copyright (c) 2010 Jose Diaz-Gonzalez
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
+Licensed under the MIT License. See [LICENSE](LICENSE).
