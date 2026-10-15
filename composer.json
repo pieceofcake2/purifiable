@@ -1,33 +1,45 @@
-
 {
-	"name": "josegonzalez/cakephp-purifiable",
-	"description": "CakePHP plugin to makes your model data so fresh, so clean",
-	"type": "cakephp-plugin",
-	"keywords": [
-		"cakephp",
-		"purifiable",
-		"behavior"
-	],
-	"homepage": "http://github.com/josegonzalez/cakephp-purifiable",
-	"license": "MIT",
-	"authors": [
-		{
-			"name": "Jose Diaz-Gonzalez",
-			"email": "email@josediazgonzalez.com",
-			"homepage": "http://josediazgonzalez.com",
-			"role": "Maintainer"
-		}
-	],
-	"require": {
-		"composer/installers": "*",
-		"ezyang/htmlpurifier": "*"
-	},
-	"support": {
-		"email": "cakephp+purifiable@josediazgonzalez.com",
-		"issues": "https://github.com/josegonzalez/cakephp-purifiable/issues",
-		"source": "https://github.com/josegonzalez/cakephp-purifiable"
-	},
-	"extra": {
-		"installer-name": "Purifiable"
-	}
+    "name": "pieceofcake2/purifiable",
+    "description": "CakePHP 2 behavior that sanitizes model data with HTML Purifier",
+    "type": "cakephp-plugin",
+    "keywords": ["cakephp", "cakephp2", "purifiable", "behavior", "htmlpurifier", "xss"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Jose Diaz-Gonzalez",
+            "homepage": "http://josediazgonzalez.com",
+            "role": "Author"
+        }
+    ],
+    "require": {
+        "php": ">=8.0",
+        "composer/installers": "^1.0 || ^2.0",
+        "ezyang/htmlpurifier": "^4.17",
+        "pieceofcake2/cakephp": "^2.12"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^9.6",
+        "pieceofcake2/app": "^2.2",
+        "pieceofcake2/phpcs-cakephp2": "^1.1",
+        "pieceofcake2/phpstan-cakephp2": "^0.2.3"
+    },
+    "replace": {
+        "josegonzalez/cakephp-purifiable": "*"
+    },
+    "autoload-dev": {
+        "exclude-from-classmap": [
+            "vendor/pieceofcake2/app/src/Console/Command/AppShell.php"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "composer/installers": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    },
+    "extra": {
+        "installer-name": "Purifiable"
+    }
 }

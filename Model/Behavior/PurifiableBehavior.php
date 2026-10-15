@@ -1,120 +1,178 @@
 <?php
+
+App::uses('ModelBehavior', 'Model');
+
 /**
  * Purifiable Model Behavior
  *
- * Scrubs fields clean of sass
+ * Sanitizes HTML in model fields with [HTML Purifier](http://htmlpurifier.org/) before they are
+ * saved: removes malicious code (XSS) and makes the HTML standards compliant.
  *
- * @package default
+ * ```
+ * public $actsAs = [
+ *     'Purifiable.Purifiable' => [
+ *         'fields' => ['body'],
+ *         'overwrite' => true,
+ *     ],
+ * ];
+ * ```
+ *
+ * Settings:
+ *
+ * - `fields`: Fields to purify.
+ * - `overwrite`: Replace the field value with the purified HTML (default false). When false, the
+ *   purified HTML is stored in another field named with `affix` (e.g. `body_clean`).
+ * - `affix`: Affix of the field with the purified HTML (default `_clean`).
+ * - `affix_position`: `suffix` (default, `body_clean`) or `prefix` (`_cleanbody`).
+ * - `config`: HTML Purifier configuration by namespace, e.g. `['HTML' => ['Allowed' => 'p,a[href]']]`.
+ *   See http://htmlpurifier.org/live/configdoc/plain.html
+ * - `customFilters`: Class names of `HTMLPurifier_Filter` subclasses to use.
+ *
  * @author Jose Diaz-Gonzalez
- **/
-class PurifiableBehavior extends ModelBehavior {
-
-/**
- * Contains configuration settings for use with individual model objects.
- * Individual model settings should be stored as an associative array,
- * keyed off of the model name.
- *
- * @var array
- * @access public
- * @see Model::$alias
  */
-	protected $_settings = array(
-		'fields' => array(),
-		'overwrite' => false,
-		'affix' => '_clean',
-		'affix_position' => 'suffix',
-		'config' => array(
-			'HTML' => array(
-				'DefinitionID' => 'purifiable',
-				'DefinitionRev' => 1,
-				'TidyLevel' => 'heavy',
-				'Doctype' => 'XHTML 1.0 Transitional'
-			),
-			'Core' => array(
-				'Encoding' => 'UTF-8'
-			),
-			'AutoFormat' => array(
-				'RemoveSpansWithoutAttributes' => true,
-				'RemoveEmpty' => true
-			),
-		),
-		'customFilters' => array(
-		)
-	);
+class PurifiableBehavior extends ModelBehavior
+{
+    /**
+     * Default settings.
+     *
+     * @var array<string, mixed>
+     */
+    protected array $_defaults = [
+        'fields' => [],
+        'overwrite' => false,
+        'affix' => '_clean',
+        'affix_position' => 'suffix',
+        'config' => [
+            'HTML' => [
+                'DefinitionID' => 'purifiable',
+                'DefinitionRev' => 1,
+                'TidyLevel' => 'heavy',
+                'Doctype' => 'XHTML 1.0 Transitional',
+            ],
+            'Core' => [
+                'Encoding' => 'UTF-8',
+            ],
+            'AutoFormat' => [
+                'RemoveSpansWithoutAttributes' => true,
+                'RemoveEmpty' => true,
+            ],
+        ],
+        'customFilters' => [],
+    ];
 
-/**
- * Initiate Purifiable behavior
- *
- * @param object $model instance of model
- * @param array $config array of configuration settings.
- * @return void
- */
-	public function setup(Model $model, $config = array()) {
-		$this->settings[$model->alias] = $this->_settings;
+    /**
+     * HTML Purifier instances by model alias.
+     *
+     * @var array<string, HTMLPurifier>
+     */
+    protected array $_purifiers = [];
 
-		//merge custom config with default settings
-		$this->settings[$model->alias] = Hash::merge($this->settings[$model->alias], (array)$config);
-	}
+    /**
+     * Setup the behavior.
+     *
+     * @param Model $model Model using the behavior.
+     * @param array $config Settings.
+     * @return void
+     */
+    public function setup(Model $model, $config = [])
+    {
+        $settings = Hash::merge($this->_defaults, (array)$config);
+        $settings['fields'] = (array)$settings['fields'];
+        if (!isset($settings['config']['Cache']['SerializerPath']) && defined('CACHE')) {
+            $settings['config']['Cache']['SerializerPath'] = CACHE . 'htmlpurifier';
+        }
+        $this->settings[$model->alias] = $settings;
+        unset($this->_purifiers[$model->alias]);
+    }
 
-/**
- * Before save method. Called before all saves
- *
- * Handles purifying data
- *
- * @param Model $model Model instance
- * @param array $options Options passed from Model::save().
- * @return bool
- */
-	public function beforeSave(Model $model, $options = array()) {
-		foreach ($this->settings[$model->alias]['fields'] as $fieldName) {
-			if (empty($model->data[$model->alias][$fieldName])) {
-				continue;
-			}
+    /**
+     * Purify the configured fields before saving.
+     *
+     * @param Model $model Model instance.
+     * @param array $options Options passed from Model::save().
+     * @return bool
+     */
+    public function beforeSave(Model $model, $options = [])
+    {
+        $settings = $this->settings[$model->alias];
+        foreach ($settings['fields'] as $field) {
+            if (!isset($model->data[$model->alias][$field])) {
+                continue;
+            }
+            $value = $model->data[$model->alias][$field];
+            if (!is_string($value) || $value === '') {
+                continue;
+            }
 
-			if ($this->settings[$model->alias]['overwrite']) {
-				$model->data[$model->alias][$fieldName] = $this->clean($model, $model->data[$model->alias][$fieldName]);
-			} else {
-				$affix = $this->settings[$model->alias]['affix'];
-				$affixedFieldName = "{$fieldName}{$affix}";
-				if ($this->settings[$model->alias]['affix_position'] == 'prefix') {
-					$affixedFieldName = "{$affix}{$fieldName}";
-				}
-				$model->data[$model->alias][$affixedFieldName] = $this->clean($model, $model->data[$model->alias][$fieldName]);
-			}
-		}
-		return true;
-	}
+            $target = $field;
+            if (!$settings['overwrite']) {
+                $target = $settings['affix_position'] === 'prefix'
+                    ? $settings['affix'] . $field
+                    : $field . $settings['affix'];
+            }
+            $model->data[$model->alias][$target] = $this->clean($model, $value);
+        }
 
-/**
- * Sanitizes content
- *
- * @param Model $model Model instance
- * @param string $fieldValue value that will be sanitized
- * @return bool
- */
-	public function clean(Model $model, $fieldValue) {
-		if (!class_exists('HTMLPurifier')) {
-			App::import('Vendor', 'htmlpurifier/htmlpurifier');
-		}
+        return true;
+    }
 
-		//the next few lines allow the config settings to be cached
-		$config = HTMLPurifier_Config::createDefault();
-		foreach ($this->settings[$model->alias]['config'] as $namespace => $values) {
-			foreach ($values as $key => $value) {
-				$config->set("{$namespace}.{$key}", $value);
-			}
-		}
+    /**
+     * Purify HTML with the settings of the model.
+     *
+     * Also available as a model method: `$this->Post->clean($html)`.
+     *
+     * @param Model $model Model instance.
+     * @param string|null $value HTML to purify.
+     * @return string
+     */
+    public function clean(Model $model, $value)
+    {
+        return $this->getPurifier($model)->purify((string)$value);
+    }
 
-		if ($this->settings[$model->alias]['customFilters']) {
-			$filters = array();
-			foreach ($this->settings[$model->alias]['customFilters'] as $customFilter) {
-				$filters[] = new $customFilter;
-			}
-			$config->set('Filter.Custom', $filters);
-		}
+    /**
+     * The HTML Purifier instance of the model, created once.
+     *
+     * @param Model $model Model instance.
+     * @return HTMLPurifier
+     */
+    public function getPurifier(Model $model): HTMLPurifier
+    {
+        if (!isset($this->_purifiers[$model->alias])) {
+            $this->_purifiers[$model->alias] = new HTMLPurifier($this->_config($this->settings[$model->alias]));
+        }
 
-		$cleaner = new HTMLPurifier($config);
-		return $cleaner->purify($fieldValue);
-	}
+        return $this->_purifiers[$model->alias];
+    }
 
+    /**
+     * Build the HTML Purifier configuration.
+     *
+     * @param array $settings Settings of the model.
+     * @return HTMLPurifier_Config
+     */
+    protected function _config(array $settings): HTMLPurifier_Config
+    {
+        $config = HTMLPurifier_Config::createDefault();
+        foreach ($settings['config'] as $namespace => $values) {
+            foreach ((array)$values as $key => $value) {
+                $config->set($namespace . '.' . $key, $value);
+            }
+        }
+
+        $path = $settings['config']['Cache']['SerializerPath'] ?? null;
+        if (is_string($path) && $path !== '' && !is_dir($path) && !mkdir($path, 0777, true) && !is_dir($path)) {
+            throw new CakeException(sprintf('Cannot create the HTML Purifier cache directory %s.', $path));
+        }
+
+        if ($settings['customFilters']) {
+            $filters = [];
+            foreach ((array)$settings['customFilters'] as $filter) {
+                $filters[] = is_object($filter) ? $filter : new $filter();
+            }
+            $config->set('Filter.Custom', $filters);
+        }
+
+        return $config;
+    }
 }
