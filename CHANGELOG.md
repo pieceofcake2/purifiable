@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 1.0.0 - 2026-10-16
 
 First release of `pieceofcake2/purifiable`, a maintained fork of
 [josegonzalez/cakephp-purifiable](https://github.com/josegonzalez/cakephp-purifiable).
